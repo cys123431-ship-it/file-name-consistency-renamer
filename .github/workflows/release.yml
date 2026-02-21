@@ -1,0 +1,53 @@
+name: release
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-and-release:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install PyInstaller
+        shell: pwsh
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install pyinstaller
+
+      - name: Build EXE
+        shell: pwsh
+        run: |
+          pyinstaller --onefile --name file-name-renamer src/file_name_renamer.py --distpath artifacts --workpath .tmp/build --specpath .tmp/spec --clean
+
+      - name: Create checksum and zip
+        shell: pwsh
+        run: |
+          $version = "${{ github.ref_name }}"
+          $exe = "artifacts/file-name-renamer.exe"
+          $namedExe = "artifacts/file-name-renamer-$version-windows-x64.exe"
+          Copy-Item -Force $exe $namedExe
+          $sha = (Get-FileHash -Path $namedExe -Algorithm SHA256).Hash.ToLower()
+          Set-Content -Path "artifacts/file-name-renamer-$version-windows-x64.sha256" -Value "$sha  file-name-renamer-$version-windows-x64.exe" -NoNewline
+          Compress-Archive -Path $namedExe, "artifacts/file-name-renamer-$version-windows-x64.sha256", "README.md" -DestinationPath "artifacts/file-name-renamer-$version-windows-x64.zip" -CompressionLevel Optimal
+
+      - name: Publish Release Assets
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            artifacts/file-name-renamer-${{ github.ref_name }}-windows-x64.exe
+            artifacts/file-name-renamer-${{ github.ref_name }}-windows-x64.sha256
+            artifacts/file-name-renamer-${{ github.ref_name }}-windows-x64.zip
