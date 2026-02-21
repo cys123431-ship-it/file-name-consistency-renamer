@@ -45,7 +45,8 @@ python src/file_name_renamer.py "%~1" --recursive
 Compress-Archive -Path src/file_name_renamer.py,README.md -DestinationPath file-name-renamer.zip
 ```
 
-- GitHub 배포는 아래 `publish.ps1`의 `GITHUB_TOKEN` 환경변수를 이용해 진행할 수 있습니다.
+- GitHub 배포는 `scripts/publish.ps1`로 진행합니다.
+- `GITHUB_TOKEN`/`GH_TOKEN`이 없으면, Git Credential Manager 로그인 정보를 자동 사용합니다.
 
 ## 동작 규칙
 

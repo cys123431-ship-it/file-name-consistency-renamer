@@ -13,7 +13,14 @@ if (-not $token) {
     $token = $env:GH_TOKEN
 }
 if (-not $token) {
-    throw "GITHUB_TOKEN 또는 GH_TOKEN 환경변수가 필요합니다."
+    $cred = "protocol=https`nhost=github.com`n" | git credential fill
+    $tokenLine = $cred | Where-Object { $_ -like "password=*" }
+    if ($tokenLine) {
+        $token = $tokenLine.Substring(9)
+    }
+}
+if (-not $token) {
+    throw "GitHub 인증 토큰을 찾을 수 없습니다. (환경변수 또는 Git Credential Manager 로그인 필요)"
 }
 
 $Headers = @{
