@@ -13,7 +13,31 @@ $ErrorActionPreference = "Stop"
 $env:GCM_INTERACTIVE = "Never"
 $env:GIT_TERMINAL_PROMPT = "0"
 
-if (-not (git rev-parse --is-inside-work-tree 2>$null)) {
+function Invoke-Git {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string[]]$Args
+    )
+    & git @Args
+    if ($LASTEXITCODE -ne 0) {
+        throw "git $($Args -join ' ') failed with exit code $LASTEXITCODE"
+    }
+}
+
+function Get-GitOutput {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string[]]$Args
+    )
+    $output = & git @Args
+    if ($LASTEXITCODE -ne 0) {
+        throw "git $($Args -join ' ') failed with exit code $LASTEXITCODE"
+    }
+    return $output
+}
+
+$insideWorkTree = Get-GitOutput -Args @("rev-parse", "--is-inside-work-tree")
+if ($insideWorkTree.Trim() -ne "true") {
     throw "Current folder is not a git repository."
 }
 
@@ -21,7 +45,7 @@ $repoRoot = Resolve-Path (Join-Path $PSScriptRoot "..")
 Set-Location $repoRoot
 
 if ([string]::IsNullOrWhiteSpace($Branch)) {
-    $Branch = (git branch --show-current).Trim()
+    $Branch = (Get-GitOutput -Args @("branch", "--show-current")).Trim()
 }
 if ([string]::IsNullOrWhiteSpace($Branch)) {
     throw "Could not detect current branch."
@@ -37,23 +61,28 @@ if ($BuildLocal) {
         $args += "-SkipInstaller"
     }
     powershell @args
+    if ($LASTEXITCODE -ne 0) {
+        throw "Local build failed with exit code $LASTEXITCODE"
+    }
 }
 
-$status = (git status --porcelain)
+$status = Get-GitOutput -Args @("status", "--porcelain")
 if ($status) {
     throw "Working tree is not clean. Commit or stash changes before publish."
 }
 
-if (-not (git remote | Select-String "^origin$")) {
-    git remote add origin "https://github.com/$Owner/$Repo.git"
+$remotes = Get-GitOutput -Args @("remote")
+if (-not ($remotes | Select-String "^origin$")) {
+    Invoke-Git -Args @("remote", "add", "origin", "https://github.com/$Owner/$Repo.git")
 }
 
-git push -u origin $Branch
+Invoke-Git -Args @("push", "-u", "origin", $Branch)
 
-if (-not (git tag -l $Version)) {
-    git tag -a $Version -m "Release $Version"
+$existingTag = Get-GitOutput -Args @("tag", "-l", $Version)
+if (-not $existingTag) {
+    Invoke-Git -Args @("tag", "-a", $Version, "-m", "Release $Version")
 }
-git push origin $Version
+Invoke-Git -Args @("push", "origin", $Version)
 
 Write-Host "Tag pushed:" $Version
 Write-Host "Release is created by GitHub Actions workflow on tag push."
