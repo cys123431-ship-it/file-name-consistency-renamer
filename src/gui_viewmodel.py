@@ -3,6 +3,8 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
+from src.app_services import ApplySummary
+
 
 def parse_extensions_input(raw: str) -> list[str]:
     tokens = re.split(r"[,\s;]+", raw.strip())
@@ -34,3 +36,14 @@ def validate_folder_path(raw: str) -> tuple[bool, str]:
     if not path.is_dir():
         return False, f"Path is not a directory: {cleaned}"
     return True, str(path.resolve())
+
+
+def format_apply_summary(summary: ApplySummary) -> str:
+    lines = [
+        f"Attempted: {summary.attempted}",
+        f"Changed: {summary.changed}",
+        f"Failed: {summary.failed}",
+    ]
+    if summary.failures:
+        lines.append(f"First error: {summary.failures[0].error}")
+    return "\n".join(lines)
